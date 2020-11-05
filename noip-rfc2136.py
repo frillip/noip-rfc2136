@@ -14,7 +14,7 @@ from aiohttp import web
 from aiohttp_basicauth_middleware import basic_auth_middleware
 import ssl
 
-log_level = logging.DEBUG
+log_level = logging.INFO
 log_format = colorlog.ColoredFormatter(
         '%(asctime)s %(log_color)s[%(levelname)s]%(reset)s %(name)s: %(message)s',
         datefmt='%Y-%m-%dT%H:%M:%S',
