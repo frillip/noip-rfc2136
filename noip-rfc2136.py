@@ -146,6 +146,11 @@ async def UpdateReq(request):
         return web.Response(text='nohost')
 
     logger.info(fqdn)
+
+    # Get the current IP from DNS
+    logger.debug('Getting current IP')
+    current_ip = GetCurrentIP(fqdn)
+
     # Check the new IP supplied is valid
     try:
         socket.inet_aton(new_ip)
@@ -154,10 +159,6 @@ async def UpdateReq(request):
         return web.Response(text='nochg ' + str(current_ip))
 
     logger.info(new_ip)
-
-    # Get the current IP from DNS
-    logger.debug('Getting current IP')
-    current_ip = GetCurrentIP(fqdn)
 
     # Check if we actually need to update
     if new_ip == current_ip:
