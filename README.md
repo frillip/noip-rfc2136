@@ -20,6 +20,7 @@ See also: `requirements.txt`
  * Supports secure BIND9 updates using TSIG keys
  * Option to use HTTP basic auth
  * Option to use HTTPS certificates
+ * Option to set configuration using environment variables
 
 ## Limitations
  * No IPv6 support. Not supported by UDM-Pro at time of writing, so I haven't put it in.
@@ -28,7 +29,10 @@ See also: `requirements.txt`
  * Does not load BIND `.key` files, the key name and secret must be configured. I do not have a way of robustly parsing these yet.
 
 ## Usage
-Edit the variables in the top of `noip-rfc2136.py` to suit:
+Edit the variables in the top of `noip-rfc2136.py` to suit, or define them as environment variables:
+
+### Logging config
+ * `log_level`: The log level. Can be one of `NOTSET` `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL`
 
 ### DNS
  * `dns_nameserver`: The IP of the DNS server you want to update
