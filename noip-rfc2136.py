@@ -210,7 +210,7 @@ def build_conf():
     logger.debug('dns_ttl = ' + str(dns_ttl))
     logger.debug('dns_tsig_key_name = ' + dns_tsig_key_name)
     logger.debug('dns_tsig_key_secret = ***********')
-    logger.debug('dns_tsig_key_algorithm = ' dns_tsig_key_algorithm)
+    logger.debug('dns_tsig_key_algorithm = ' + dns_tsig_key_algorithm)
     logger.debug('listen_host = ' + listen_host)
     logger.debug('listen_port = ' + listen_port)
     logger.debug('ssl_enabled = ' + str(ssl_enabled))
