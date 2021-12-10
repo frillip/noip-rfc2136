@@ -179,6 +179,7 @@ def build_conf():
     global dns_ttl
     global dns_tsig_key_name
     global dns_tsig_key_secret
+    global dns_tsig_key_algorithm
     global listen_host
     global listen_port
     global ssl_enabled
