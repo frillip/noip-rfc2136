@@ -25,6 +25,8 @@ dns_zone = 'example.com.'
 dns_ttl = 30
 dns_tsig_key_name = 'example_key_name'
 dns_tsig_key_secret = 'aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1vSGc1U0pZUkhBMA=='
+dns_tsig_key_algorithm = 'hmac-sha256'
+
 # Empty DNS keyring object to be populated later
 dns_keyring = None
 
@@ -85,7 +87,7 @@ def UpdateDNS(fqdn, new_ip):
     logger.debug('Doing DNS update for ' + fqdn)
     logger.debug('New IP: ' + new_ip)
 
-    update = dns.update.Update(dns_zone, keyring=dns_keyring)
+    update = dns.update.Update(dns_zone, keyring=dns_keyring, keyalgorithm=dns_tsig_key_algorithm)
 
     logger.debug('Updating record for ' + fqdn)
     update.replace(fqdn, dns_ttl, 'A', new_ip)
@@ -177,6 +179,7 @@ def build_conf():
     global dns_ttl
     global dns_tsig_key_name
     global dns_tsig_key_secret
+    global dns_tsig_key_algorithm
     global listen_host
     global listen_port
     global ssl_enabled
@@ -192,6 +195,7 @@ def build_conf():
     dns_ttl = os.environ.get('dns_ttl', dns_ttl)
     dns_tsig_key_name = os.environ.get('dns_tsig_key_name', dns_tsig_key_name)
     dns_tsig_key_secret = os.environ.get('dns_tsig_key_secret', dns_tsig_key_secret)
+    dns_tsig_key_algorithm = os.environ.get('dns_tsig_key_algorithm', dns_tsig_key_algorithm)
     listen_host = os.environ.get('listen_host', listen_host)
     listen_port = os.environ.get('listen_port', listen_port)
     ssl_enabled = bool(strtobool(os.environ.get('ssl_enabled'))) if os.environ.get('ssl_enabled') else ssl_enabled
@@ -207,6 +211,7 @@ def build_conf():
     logger.debug('dns_ttl = ' + str(dns_ttl))
     logger.debug('dns_tsig_key_name = ' + dns_tsig_key_name)
     logger.debug('dns_tsig_key_secret = ***********')
+    logger.debug('dns_tsig_key_algorithm = ' + dns_tsig_key_algorithm)
     logger.debug('listen_host = ' + listen_host)
     logger.debug('listen_port = ' + listen_port)
     logger.debug('ssl_enabled = ' + str(ssl_enabled))
