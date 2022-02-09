@@ -122,9 +122,7 @@ class AppConfig:
 
 # Empty DNS keyring object to be populated later
 dns_keyring = None
-
 resolver = dns.resolver.Resolver(configure=False)
-
 
 def GetCurrentIP(fqdn):
 
@@ -136,15 +134,20 @@ def GetCurrentIP(fqdn):
     try:
         answer = resolver.query(fqdn, 'A')
         current_ip = answer[0].to_text()
+        status = 'OK'
         logger.debug('Got current IP: ' + str(current_ip))
     except (dns.resolver.NXDOMAIN,
-            dns.resolver.NoAnswer,
             KeyError):
         # If it's not in DNS, return nothing
         logger.debug('No IP in DNS for ' + str(fqdn))
         current_ip = None
-
-    return current_ip
+        status = 'MISSING'
+    except (dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers):
+        logger.warning('No response from DNS for ' + str(fqdn))
+        current_ip = None
+        status = 'MISCONFIGURED_DNS'
+    return current_ip, status
 
 
 def UpdateDNS(fqdn, new_ip):
@@ -161,7 +164,9 @@ def UpdateDNS(fqdn, new_ip):
         logger.info('Update done')
         dns_resp = 'good ' + str(new_ip)
         return dns_resp
-    except dns.tsig.PeerBadKey:
+    except (dns.tsig.PeerBadKey,
+            dns.tsig.BadSignature,
+            dns.tsig.BadTime):
         logger.error('TSIG key failure on update!')
         # If our tsig key is broken, return 'badagent'
         # even though this is not technically correct
@@ -212,38 +217,42 @@ async def UpdateReq(request):
         logger.error('No FQDN in request')
         return web.Response(text='nohost')
 
-    if not fqdn.endswith(config.dns.zone):
+    if not fqdn == config.dns.zone and not fqdn.endswith("." + config.dns.zone):
         logger.error('FQDN is not in DNS zone specified')
         return web.Response(text='nohost')
 
-    logger.info(fqdn)
+    logger.info("Zone: " + str(fqdn))
 
     # Get the current IP from DNS
     logger.debug('Getting current IP')
-    current_ip = GetCurrentIP(fqdn)
+    current_ip,status = GetCurrentIP(fqdn)
 
-    # Check the new IP supplied is valid
-    try:
-        socket.inet_aton(new_ip)
-    except socket.error:
-        logger.error('Invalid new IP in request: ' + str(new_ip))
-        return web.Response(text='nochg ' + str(current_ip))
+    if status == 'MISCONFIGURED_DNS':
+        logger.error('Cannot update ' + str(fqdn) + ' in zone ' + str(config.dns.zone))
+        return web.Response(text='badagent')
 
-    logger.info(new_ip)
+    # FQDN does not exist
+    elif status == 'MISSING':
+        logger.error('FQDN does not exist!')
+        # Return 'nohost'
+        return web.Response(text='nohost')
 
-    # Check if we actually need to update
-    if new_ip != current_ip:
-        # Only update if the record exists
-        if current_ip:
+    elif status == 'OK':
+        # Check the new IP supplied is valid
+        try:
+            socket.inet_aton(new_ip)
+            logger.info("New IP: " + new_ip)
+        except socket.error:
+            logger.error('Invalid new IP in request: ' + str(new_ip))
+            return web.Response(text='nochg ' + str(current_ip))
+
+        # Check if we actually need to update
+        if new_ip != current_ip:
             dns_resp = UpdateDNS(fqdn, new_ip)
             return web.Response(text=dns_resp)
-        # Otherwise return 'nohost'
         else:
-            logger.error('FQDN does not exist!')
-            return web.Response(text='nohost')
-    else:
-        logger.info('New IP matches current IP, no update required')
-        return web.Response(text='nochg ' + str(current_ip))
+            logger.info('New IP matches current IP, no update required')
+            return web.Response(text='nochg ' + str(current_ip))
     # We should not get here
     # If we do, something is very wrong
     dns_resp = '911'
