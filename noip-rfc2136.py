@@ -1,48 +1,21 @@
 #!/usr/bin/python3
 
+import os
 import sys
+import ssl
+import socket
 import json
 import logging
+from time import sleep
+from distutils.util import strtobool
+import yaml
 import colorlog
-import socket
 import dns.update
 import dns.query
 import dns.tsigkeyring
 import dns.resolver
-from time import sleep
 from aiohttp import web
 from aiohttp_basicauth_middleware import basic_auth_middleware
-import ssl
-import os
-from distutils.util import strtobool
-
-# Logging Config
-log_level = 'INFO'
-
-# DNS config
-dns_nameserver = '198.51.100.2'
-dns_zone = 'example.com.'
-dns_ttl = 30
-dns_tsig_key_name = 'example_key_name'
-dns_tsig_key_secret = 'aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1vSGc1U0pZUkhBMA=='
-dns_tsig_key_algorithm = 'hmac-sha256'
-
-# Empty DNS keyring object to be populated later
-dns_keyring = None
-
-# HTTP server config
-listen_host = '127.0.0.1'
-listen_port = '8000'
-
-# HTTPS config
-ssl_enabled = False
-ssl_key_file = '/etc/letsencrypt/live/example.com/privkey.pem'
-ssl_cert_file = '/etc/letsencrypt/live/example.com/fullchain.pem'
-
-# HTTP basic auth config
-basic_auth_enabled = False
-basic_auth_user = 'user'
-basic_auth_pass = 'pass'
 
 log_format = colorlog.ColoredFormatter(
         '%(asctime)s %(log_color)s[%(levelname)s]%(reset)s %(name)s: %(message)s',
@@ -58,17 +31,108 @@ log_format = colorlog.ColoredFormatter(
 
 handler = colorlog.StreamHandler()
 handler.setFormatter(log_format)
-logger = colorlog.getLogger('dnsupdate')
+logger = colorlog.getLogger('noip_rfc2136')
 logger.addHandler(handler)
-logging_level = logging.getLevelName(os.environ.get('log_level', log_level))
-logger.setLevel(logging_level)
+logger.setLevel("INFO")
+
+
+# Config file
+config = None
+config_file = 'config.yaml'
+
+
+class AppConfig:
+    def __init__(self, file):
+        self.file = file
+        logger.info('Loading config from ' + self.file)
+        if os.path.exists(self.file):
+            with open(self.file, 'r') as file:
+                logger.debug('Opened '+self.file)
+                self.loaded_yaml = yaml.safe_load(file)
+        else:
+            logger.error("Error loading config: \'" + self.file + "\' not found")
+            sys.exit(1)
+
+        self.dns = self.Dns()
+        self.dns.nameserver = self.loaded_yaml['noip_rfc2136']['dns']['nameserver']
+        self.dns.zone = self.loaded_yaml['noip_rfc2136']['dns']['zone']
+        if self.loaded_yaml['noip_rfc2136']['dns'].get("ttl") is not None:
+            self.dns.ttl = self.loaded_yaml['noip_rfc2136']['dns']['ttl']
+        self.dns.tsig_key_name = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_name']
+        self.dns.tsig_key_secret = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_secret']
+        self.dns.tsig_key_algorithm = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_algorithm']
+
+        self.listen = self.Listen()
+        if self.loaded_yaml['noip_rfc2136'].get("listen") is not None:
+            if self.loaded_yaml['noip_rfc2136']['listen'].get("host") is not None:
+                self.listen.host = self.loaded_yaml['noip_rfc2136']['listen']['host']
+            if self.loaded_yaml['noip_rfc2136']['listen'].get("port") is not None:
+                self.listen.port = self.loaded_yaml['noip_rfc2136']['listen']['port']
+
+        self.https = self.Https()
+        if self.loaded_yaml['noip_rfc2136'].get("https") is not None:
+            if self.loaded_yaml['noip_rfc2136']['https'].get("enabled") is not None:
+                self.https.enabled = self.loaded_yaml['noip_rfc2136']['https']['enabled']
+            if self.https.enabled:
+                self.https.key_file = self.loaded_yaml['noip_rfc2136']['https']['key_file']
+                self.https.cert_file = self.loaded_yaml['noip_rfc2136']['https']['cert_file']
+
+        self.auth = self.Auth()
+        if self.loaded_yaml['noip_rfc2136'].get("auth") is not None:
+            if self.loaded_yaml['noip_rfc2136']['auth'].get("enabled") is not None:
+                self.auth.enabled = self.loaded_yaml['noip_rfc2136']['auth']['enabled']
+            if self.auth.enabled:
+                self.auth.username = self.loaded_yaml['noip_rfc2136']['auth']['username']
+                self.auth.password = self.loaded_yaml['noip_rfc2136']['auth']['password']
+
+        self.log = self.Log()
+        if self.loaded_yaml['noip_rfc2136'].get("log") is not None:
+            if self.loaded_yaml['noip_rfc2136']['log'].get("level") is not None:
+                self.log.level = self.loaded_yaml['noip_rfc2136']['log']['level']
+
+    class Dns:
+        def __init__(self):
+            self.nameserver = None
+            self.zone = None
+            self.ttl = 30
+            self.key_name = None
+            self.key_secret = None
+            self.key_algorithm = None
+
+    class Listen:
+        def __init__(self):
+            self.host = 'localhost'
+            self.port = 8000
+
+    class Https:
+        def __init__(self):
+            self.enabled = False
+            self.key_file = None
+            self.cert_file = None
+
+    class Auth:
+        def __init__(self):
+            self.enabled = False
+            self.username = None
+            self.password = None
+
+    class Log:
+        def __init__(self):
+            self.level = "INFO"
+
+# Empty DNS keyring object to be populated later
+dns_keyring = None
 
 resolver = dns.resolver.Resolver(configure=False)
 
+
 def GetCurrentIP(fqdn):
+
+    global config
+
     # Get what's currently in DNS
     curent_ip = None
-    logger.debug('Querying IP for ' + str(fqdn) + ' from ' + str(dns_nameserver))
+    logger.debug('Querying IP for ' + str(fqdn) + ' from ' + str(config.dns.nameserver))
     try:
         answer = resolver.query(fqdn, 'A')
         current_ip = answer[0].to_text()
@@ -87,13 +151,13 @@ def UpdateDNS(fqdn, new_ip):
     logger.debug('Doing DNS update for ' + fqdn)
     logger.debug('New IP: ' + new_ip)
 
-    update = dns.update.Update(dns_zone, keyring=dns_keyring, keyalgorithm=dns_tsig_key_algorithm)
+    update = dns.update.Update(config.dns.zone, keyring=dns_keyring, keyalgorithm=config.dns.tsig_key_algorithm)
 
     logger.debug('Updating record for ' + fqdn)
-    update.replace(fqdn, dns_ttl, 'A', new_ip)
+    update.replace(fqdn, config.dns.ttl, 'A', new_ip)
 
     try:
-        response = dns.query.tcp(update, dns_nameserver, timeout=10)
+        response = dns.query.tcp(update, config.dns.nameserver, timeout=10)
         logger.info('Update done')
         dns_resp = 'good ' + str(new_ip)
         return dns_resp
@@ -138,6 +202,9 @@ def ProcessReq(request_query, remote_ip):
 
 
 async def UpdateReq(request):
+
+    global config
+
     logger.info('Update request from ' + str(request.remote))
     fqdn, new_ip = ProcessReq(request.query, request.remote)
     # Check the FQDN
@@ -145,7 +212,7 @@ async def UpdateReq(request):
         logger.error('No FQDN in request')
         return web.Response(text='nohost')
 
-    if not fqdn.endswith(dns_zone):
+    if not fqdn.endswith(config.dns.zone):
         logger.error('FQDN is not in DNS zone specified')
         return web.Response(text='nohost')
 
@@ -183,91 +250,93 @@ async def UpdateReq(request):
     return web.Response(text=dns_resp)
 
 
-def build_conf():
+def build_conf(config_file):
 
-    global dns_nameserver
-    global dns_zone
-    global dns_ttl
-    global dns_tsig_key_name
-    global dns_tsig_key_secret
-    global dns_tsig_key_algorithm
-    global listen_host
-    global listen_port
-    global ssl_enabled
-    global ssl_key_file
-    global ssl_cert_file
-    global basic_auth_enabled
-    global basic_auth_user
-    global basic_auth_pass
-
+    config = AppConfig(config_file)
     # Update config from environment variables if present
-    dns_nameserver = os.environ.get('dns_nameserver', dns_nameserver)
-    dns_zone = os.environ.get('dns_zone', dns_zone)
-    dns_ttl = os.environ.get('dns_ttl', dns_ttl)
-    dns_tsig_key_name = os.environ.get('dns_tsig_key_name', dns_tsig_key_name)
-    dns_tsig_key_secret = os.environ.get('dns_tsig_key_secret', dns_tsig_key_secret)
-    dns_tsig_key_algorithm = os.environ.get('dns_tsig_key_algorithm', dns_tsig_key_algorithm)
-    listen_host = os.environ.get('listen_host', listen_host)
-    listen_port = os.environ.get('listen_port', listen_port)
-    ssl_enabled = bool(strtobool(os.environ.get('ssl_enabled'))) if os.environ.get('ssl_enabled') else ssl_enabled
-    ssl_key_file = os.environ.get('ssl_key_file', ssl_key_file)
-    ssl_cert_file = os.environ.get('ssl_cert_file', ssl_cert_file)
-    basic_auth_enabled = bool(strtobool(os.environ.get('basic_auth_enabled'))) if os.environ.get('basic_auth_enabled') else basic_auth_enabled
-    basic_auth_user = os.environ.get('basic_auth_user', basic_auth_user)
-    basic_auth_pass = os.environ.get('basic_auth_pass', basic_auth_pass)
+    config.dns.nameserver = os.environ.get('NOIP_RFC2136_DNS_NAMESERVER', config.dns.nameserver)
+    config.dns.zone = os.environ.get('NOIP_RFC2136_DNS_ZONE', config.dns.zone)
+    config.dns.ttl = os.environ.get('NOIP_RFC2136_DNS_TTL', config.dns.ttl)
+    config.dns.tsig_key_name = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_NAME', config.dns.tsig_key_name)
+    config.dns.tsig_key_secret = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_SECRET', config.dns.tsig_key_secret)
+    config.dns.tsig_key_algorithm = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_ALGORITHM', config.dns.tsig_key_algorithm)
+    config.listen.host = os.environ.get('NOIP_RFC2136_LISTEN_HOST', config.listen.host)
+    config.listen.port = os.environ.get('NOIP_RFC2136_LISTEN_PORT', config.listen.port)
+    config.https.enabled = bool(strtobool(os.environ.get('NOIP_RFC2136_HTTPS_ENABLED'))) if os.environ.get('NOIP_RFC2136_HTTPS_ENABLED') else config.https.enabled
+    if config.https.enabled:
+        config.https.key_file = os.environ.get('NOIP_RFC2136_HTTPS_KEY_FILE', config.https.key_file)
+        config.https.cert_file = os.environ.get('NOIP_RFC2136_HTTPS_CERT_FILE', config.https.cert_file)
+    else:
+        config.https.key_file = None
+        config.https.cert_file = None
+    config.auth.enabled = bool(strtobool(os.environ.get('NOIP_RFC2136_AUTH_ENABLED'))) if os.environ.get('NOIP_RFC2136_AUTH_ENABLED') else config.auth.enabled
+    if config.auth.enabled:
+        config.auth.username = os.environ.get('NOIP_RFC2136_AUTH_USERNAME', config.auth.username)
+        config.auth.password = os.environ.get('NOIP_RFC2136_AUTH_PASSWORD', config.auth.password)
+    else:
+        config.auth.username = None
+        config.auth.password = None
+
+    config.log.level = logging.getLevelName(os.environ.get('NOIP_RFC2136_LOG_LEVEL', config.log.level))
+    logger.setLevel(config.log.level)
 
     # Print config for troubleshooting
-    logger.debug('dns_nameserver = ' + dns_nameserver)
-    logger.debug('dns_zone = ' + dns_zone)
-    logger.debug('dns_ttl = ' + str(dns_ttl))
-    logger.debug('dns_tsig_key_name = ' + dns_tsig_key_name)
-    logger.debug('dns_tsig_key_secret = ***********')
-    logger.debug('dns_tsig_key_algorithm = ' + dns_tsig_key_algorithm)
-    logger.debug('listen_host = ' + listen_host)
-    logger.debug('listen_port = ' + listen_port)
-    logger.debug('ssl_enabled = ' + str(ssl_enabled))
-    logger.debug('ssl_key_file = ' + ssl_key_file)
-    logger.debug('ssl_cert_file = ' + ssl_cert_file)
-    logger.debug('basic_auth_enabled = ' + str(basic_auth_enabled))
-    logger.debug('basic_auth_user = ' + basic_auth_user)
-    logger.debug('basic_auth_pass = ' + basic_auth_pass)
+    logger.debug('config.dns.nameserver = ' + str(config.dns.nameserver))
+    logger.debug('config.dns.zone = ' + str(config.dns.zone))
+    logger.debug('config.dns.ttl = ' + str(config.dns.ttl))
+    logger.debug('config.dns.tsig_key_name = ' + str(config.dns.tsig_key_name))
+    logger.debug('config.dns.tsig_key_secret = ***********')
+    logger.debug('config.dns.tsig_key_algorithm = ' + str(config.dns.tsig_key_algorithm))
+    logger.debug('config.listen.host = ' + str(config.listen.host))
+    logger.debug('config.listen.port = ' + str(config.listen.port))
+    logger.debug('config.https.enabled = ' + str(config.https.enabled))
+    logger.debug('config.https.key_file = ' + str(config.https.key_file or 'None'))
+    logger.debug('config.https.cert_file = ' + str(config.https.cert_file or 'None'))
+    logger.debug('config.auth.enabled = ' + str(config.auth.enabled))
+    logger.debug('config.auth.username = ' + str(config.auth.username or 'None'))
+    logger.debug('config.auth.password = ' + str(config.auth.password or 'None'))
+
+    return config
+
 
 def main():
 
+    global config
+
     logger.info('Starting noip-rfc2136')
 
-    # Build the configuration from environment variables or globals
-    build_conf()
+    # Build the configuration from YAML file and environment variables if present
+    config = build_conf(config_file)
 
     # Set name servers
-    resolver.nameservers = [dns_nameserver]
+    resolver.nameservers = [config.dns.nameserver]
 
     # Load our TSIG key
     dns_update_key = {}
-    dns_update_key[dns_tsig_key_name] = dns_tsig_key_secret
+    dns_update_key[config.dns.tsig_key_name] = config.dns.tsig_key_secret
     global dns_keyring
     dns_keyring = dns.tsigkeyring.from_text(dns_update_key)
-    logger.debug('Loaded TSIG key ' + dns_tsig_key_name + ' from config')
+    logger.debug('Loaded TSIG key ' + config.dns.tsig_key_name + ' from config')
 
     # Load our SSL key
-    if ssl_enabled:
+    if config.https.enabled:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(ssl_cert_file, ssl_key_file)
-        logger.debug('Loaded SSL key: ' + str(ssl_key_file))
-        logger.debug('Loaded SSL certificate: ' + str(ssl_cert_file))
+        context.load_cert_chain(config.https.cert_file, config.https.key_file)
+        logger.debug('Loaded SSL key: ' + str(config.https.key_file))
+        logger.debug('Loaded SSL certificate: ' + str(config.https.cert_file))
     else:
         context = None
 
     app = web.Application()
     app.add_routes([web.get('/update', UpdateReq)])
-    if basic_auth_enabled:
+    if config.auth.enabled:
         app.middlewares.append(
             basic_auth_middleware(
                 ('/',),
-                {basic_auth_user: basic_auth_pass},
+                {config.auth.username: config.auth.password},
             )
         )
-    web.run_app(app, host=listen_host, port=listen_port, ssl_context=context)
+    web.run_app(app, host=config.listen.host, port=config.listen.port, ssl_context=context)
 
 
 if __name__ == '__main__':
