@@ -77,7 +77,7 @@ def GetCurrentIP(fqdn):
             dns.resolver.NoAnswer,
             KeyError):
         # If it's not in DNS, return nothing
-        logger.debug('No IP in DNS for ' + str(current_ip))
+        logger.debug('No IP in DNS for ' + str(fqdn))
         current_ip = None
 
     return current_ip
@@ -165,12 +165,23 @@ async def UpdateReq(request):
     logger.info(new_ip)
 
     # Check if we actually need to update
-    if new_ip == current_ip:
+    if new_ip != current_ip:
+        # Only update if the record exists
+        if current_ip:
+            dns_resp = UpdateDNS(fqdn, new_ip)
+            return web.Response(text=dns_resp)
+        # Otherwise return 'nohost'
+        else:
+            logger.error('FQDN does not exist!')
+            return web.Response(text='nohost')
+    else:
         logger.info('New IP matches current IP, no update required')
         return web.Response(text='nochg ' + str(current_ip))
-
-    dns_resp = UpdateDNS(fqdn, new_ip)
+    # We should not get here
+    # If we do, something is very wrong
+    dns_resp = '911'
     return web.Response(text=dns_resp)
+
 
 def build_conf():
 
