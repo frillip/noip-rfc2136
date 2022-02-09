@@ -13,25 +13,11 @@ from time import sleep
 from aiohttp import web
 from aiohttp_basicauth_middleware import basic_auth_middleware
 import ssl
+import os
+from distutils.util import strtobool
 
-log_level = logging.INFO
-log_format = colorlog.ColoredFormatter(
-        '%(asctime)s %(log_color)s[%(levelname)s]%(reset)s %(name)s: %(message)s',
-        datefmt='%Y-%m-%dT%H:%M:%S',
-        log_colors={
-            'DEBUG': 'cyan',
-            'INFO': 'green',
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'red,bg_white',
-            }
-        )
-
-handler = colorlog.StreamHandler()
-handler.setFormatter(log_format)
-logger = colorlog.getLogger('dnsupdate')
-logger.addHandler(handler)
-logger.setLevel(log_level)
+# Logging Config
+log_level = 'INFO'
 
 # DNS config
 dns_nameserver = '198.51.100.2'
@@ -39,6 +25,8 @@ dns_zone = 'example.com.'
 dns_ttl = 30
 dns_tsig_key_name = 'example_key_name'
 dns_tsig_key_secret = 'aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1vSGc1U0pZUkhBMA=='
+dns_tsig_key_algorithm = 'hmac-sha256'
+
 # Empty DNS keyring object to be populated later
 dns_keyring = None
 
@@ -56,10 +44,26 @@ basic_auth_enabled = False
 basic_auth_user = 'user'
 basic_auth_pass = 'pass'
 
+log_format = colorlog.ColoredFormatter(
+        '%(asctime)s %(log_color)s[%(levelname)s]%(reset)s %(name)s: %(message)s',
+        datefmt='%Y-%m-%dT%H:%M:%S',
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red,bg_white',
+            }
+        )
+
+handler = colorlog.StreamHandler()
+handler.setFormatter(log_format)
+logger = colorlog.getLogger('dnsupdate')
+logger.addHandler(handler)
+logging_level = logging.getLevelName(os.environ.get('log_level', log_level))
+logger.setLevel(logging_level)
 
 resolver = dns.resolver.Resolver(configure=False)
-resolver.nameservers = [dns_nameserver]
-
 
 def GetCurrentIP(fqdn):
     # Get what's currently in DNS
@@ -83,7 +87,7 @@ def UpdateDNS(fqdn, new_ip):
     logger.debug('Doing DNS update for ' + fqdn)
     logger.debug('New IP: ' + new_ip)
 
-    update = dns.update.Update(dns_zone, keyring=dns_keyring)
+    update = dns.update.Update(dns_zone, keyring=dns_keyring, keyalgorithm=dns_tsig_key_algorithm)
 
     logger.debug('Updating record for ' + fqdn)
     update.replace(fqdn, dns_ttl, 'A', new_ip)
@@ -168,8 +172,65 @@ async def UpdateReq(request):
     dns_resp = UpdateDNS(fqdn, new_ip)
     return web.Response(text=dns_resp)
 
+def build_conf():
+
+    global dns_nameserver
+    global dns_zone
+    global dns_ttl
+    global dns_tsig_key_name
+    global dns_tsig_key_secret
+    global dns_tsig_key_algorithm
+    global listen_host
+    global listen_port
+    global ssl_enabled
+    global ssl_key_file
+    global ssl_cert_file
+    global basic_auth_enabled
+    global basic_auth_user
+    global basic_auth_pass
+
+    # Update config from environment variables if present
+    dns_nameserver = os.environ.get('dns_nameserver', dns_nameserver)
+    dns_zone = os.environ.get('dns_zone', dns_zone)
+    dns_ttl = os.environ.get('dns_ttl', dns_ttl)
+    dns_tsig_key_name = os.environ.get('dns_tsig_key_name', dns_tsig_key_name)
+    dns_tsig_key_secret = os.environ.get('dns_tsig_key_secret', dns_tsig_key_secret)
+    dns_tsig_key_algorithm = os.environ.get('dns_tsig_key_algorithm', dns_tsig_key_algorithm)
+    listen_host = os.environ.get('listen_host', listen_host)
+    listen_port = os.environ.get('listen_port', listen_port)
+    ssl_enabled = bool(strtobool(os.environ.get('ssl_enabled'))) if os.environ.get('ssl_enabled') else ssl_enabled
+    ssl_key_file = os.environ.get('ssl_key_file', ssl_key_file)
+    ssl_cert_file = os.environ.get('ssl_cert_file', ssl_cert_file)
+    basic_auth_enabled = bool(strtobool(os.environ.get('basic_auth_enabled'))) if os.environ.get('basic_auth_enabled') else basic_auth_enabled
+    basic_auth_user = os.environ.get('basic_auth_user', basic_auth_user)
+    basic_auth_pass = os.environ.get('basic_auth_pass', basic_auth_pass)
+
+    # Print config for troubleshooting
+    logger.debug('dns_nameserver = ' + dns_nameserver)
+    logger.debug('dns_zone = ' + dns_zone)
+    logger.debug('dns_ttl = ' + str(dns_ttl))
+    logger.debug('dns_tsig_key_name = ' + dns_tsig_key_name)
+    logger.debug('dns_tsig_key_secret = ***********')
+    logger.debug('dns_tsig_key_algorithm = ' + dns_tsig_key_algorithm)
+    logger.debug('listen_host = ' + listen_host)
+    logger.debug('listen_port = ' + listen_port)
+    logger.debug('ssl_enabled = ' + str(ssl_enabled))
+    logger.debug('ssl_key_file = ' + ssl_key_file)
+    logger.debug('ssl_cert_file = ' + ssl_cert_file)
+    logger.debug('basic_auth_enabled = ' + str(basic_auth_enabled))
+    logger.debug('basic_auth_user = ' + basic_auth_user)
+    logger.debug('basic_auth_pass = ' + basic_auth_pass)
 
 def main():
+
+    logger.info('Starting noip-rfc2136')
+
+    # Build the configuration from environment variables or globals
+    build_conf()
+
+    # Set name servers
+    resolver.nameservers = [dns_nameserver]
+
     # Load our TSIG key
     dns_update_key = {}
     dns_update_key[dns_tsig_key_name] = dns_tsig_key_secret
