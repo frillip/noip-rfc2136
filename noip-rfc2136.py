@@ -77,7 +77,7 @@ def GetCurrentIP(fqdn):
             dns.resolver.NoAnswer,
             KeyError):
         # If it's not in DNS, return nothing
-        logger.debug('No IP in DNS for ' + str(current_ip))
+        logger.debug('No IP in DNS for ' + str(fqdn))
         current_ip = None
 
     return current_ip
