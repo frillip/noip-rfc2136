@@ -29,32 +29,46 @@ See also: `requirements.txt`
  * Does not load BIND `.key` files, the key name and secret must be configured. I do not have a way of robustly parsing these yet.
 
 ## Usage
-Edit the variables in the top of `noip-rfc2136.py` to suit, or define them as environment variables:
-
-### Logging config
- * `log_level`: The log level. Can be one of `NOTSET` `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL`
+Edit the sample YAML file to suit and save as `config.yaml`, or define them as environment variables:
 
 ### DNS
- * `dns_nameserver`: The IP of the DNS server you want to update
- * `dns_zone`: The zone you want to update
- * `dns_ttl`: TTL of the record
- * `dns_tsig_key_name`: String containing the TSIG key name
- * `dns_tsig_key_secret`: Base64 encoded string containing the TSIG key secret
- * `dns_tsig_key_algorithm`: The algorithm used to generate the key, eg hmac-sha256
+
+| YAML key | Description | Optional | Default | Environment variable |
+| :--- | :--- | :--- | :--- | :--- |
+| `nameserver` | The IP of the DNS server you want to update | No | N/A | `NOIP_RFC2136_DNS_NAMESERVER` |
+| `zone` | The zone you want to update | No | N/A | ` NOIP_RFC2136_DNS_ZONE` |
+| `ttl` | TTL of the record | Yes | 30 | ` NOIP_RFC2136_DNS_TTL` |
+| `tsig_key_name` | String containing the TSIG key name | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_NAME` |
+| `tsig_key_secret` | Base64 encoded string containing the TSIG key secret | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_SECRET` |
+| `tsig_key_algorithm` | The algorithm used to generate the key, eg `hmac-sha256` | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_ALGORITHM` |
 
 ### HTTP server config
- * `listen_host`: The IP address the HTTP should bind to. Set to `None` to listen on ALL addresses (not recommended).
- * `listen_port`: The port the HTTP server should listen on.
+
+| YAML key | Description | Optional | Default | Environment variable |
+| :--- | :--- | :--- | :--- | :--- |
+|  `host` | The IP address the HTTP should bind to. Set to `None` to listen on ALL addresses (not recommended) | Yes | `localhost` | `NOIP_RFC2136_LISTEN_HOST` |
+|  `port` | The port the HTTP server should listen on | Yes | `8000` | `NOIP_RFC2136_LISTEN_PORT` |
 
 ### HTTPS config
- * `ssl_enabled`: Set to `True` to enable HTTPS, `False` for plain HTTP.
- * `ssl_key_file`: Path to HTTPS private key file
- * `ssl_cert_file`: Path HTTPS certificate file
+
+| YAML key | Description | Optional | Default | Environment variable |
+| :--- | :--- | :--- | :--- | :--- |
+|  `enabled` | Set to `True` to enable HTTPS, `False` for plain HTTP | Yes | `False` | `NOIP_RFC2136_HTTPS_ENABLED` |
+|  `key_file` | Path to HTTPS private key file | Yes | `None` | `NOIP_RFC2136_HTTPS_KEY_FILE` |
+|  `cert_file` | Path HTTPS certificate file | Yes | `None` | `NOIP_RFC2136_HTTPS_CERT_FILE` |
 
 ### HTTP basic auth config
- * `basic_auth_enabled`: Set to `True` to enable HTTP basic auth, `False` to disable.
- * `basic_auth_user`: String containing HTTP basic username
- * `basic_auth_pass`: String containing HTTP basic password
+
+| YAML key | Description | Optional | Default | Environment variable |
+| :--- | :--- | :--- | :--- | :--- |
+| `enabled` |  Set to `True` to enable HTTP basic auth, `False` to disable | Yes | `False` | `NOIP_RFC2136_AUTH_ENABLED` |
+| `username` | String containing HTTP basic username | Yes | `None` | `NOIP_RFC2136_BASIC_AUTH_USERNAME` |
+| `password` | String containing HTTP basic password | Yes | `None` | `NOIP_RFC2136_BASIC_AUTH_PASSWORD` |
+
+### Logging config
+| YAML key | Description | Optional | Default | Environment variable |
+| :--- | :--- | :--- | :--- | :--- |
+| `level` | The log level. Can be one of `NOTSET` `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL` | Yes | `INFO` | `NOIP_RFC2136_LOG_LEVEL` |
 
 ### UDM-Pro settings:
 To use with a UDM-Pro, put these settings in the Dynamic DNS section of the Unifi Controller GUI:
