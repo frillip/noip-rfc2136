@@ -38,6 +38,7 @@ Edit the sample YAML file to suit and save as `config.yaml`, or define them as e
 | `nameserver` | The IP of the DNS server you want to update | No | N/A | `NOIP_RFC2136_DNS_NAMESERVER` |
 | `zone` | The zone you want to update | No | N/A | ` NOIP_RFC2136_DNS_ZONE` |
 | `ttl` | TTL of the record | Yes | 30 | ` NOIP_RFC2136_DNS_TTL` |
+| `create_enabled` | Allow creation of records in DNS if they do not exist | Yes | False | ` NOIP_RFC2136_DNS_CREATE_ENABLED` |
 | `tsig_key_name` | String containing the TSIG key name | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_NAME` |
 | `tsig_key_secret` | Base64 encoded string containing the TSIG key secret | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_SECRET` |
 | `tsig_key_algorithm` | The algorithm used to generate the key, eg `hmac-sha256` | No | N/A | ` NOIP_RFC2136_DNS_TSIG_KEY_ALGORITHM` |
