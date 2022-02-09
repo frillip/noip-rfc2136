@@ -56,7 +56,8 @@ class AppConfig:
         self.dns = self.Dns()
         self.dns.nameserver = self.loaded_yaml['noip_rfc2136']['dns']['nameserver']
         self.dns.zone = self.loaded_yaml['noip_rfc2136']['dns']['zone']
-        self.dns.ttl = self.loaded_yaml['noip_rfc2136']['dns']['ttl']
+        if self.loaded_yaml['noip_rfc2136']['dns'].get("ttl") is not None:
+            self.dns.ttl = self.loaded_yaml['noip_rfc2136']['dns']['ttl']
         self.dns.tsig_key_name = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_name']
         self.dns.tsig_key_secret = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_secret']
         self.dns.tsig_key_algorithm = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_algorithm']
