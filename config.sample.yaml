@@ -21,3 +21,5 @@ noip-rfc2136:
     user: user
     pass: pass
   
+  log:
+    level: INFO
