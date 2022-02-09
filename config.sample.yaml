@@ -18,8 +18,8 @@ noip_rfc2136:
   
   auth:
     enabled: False
-    user: user
-    pass: pass
+    username: user
+    password: pass
   
   log:
     level: INFO
