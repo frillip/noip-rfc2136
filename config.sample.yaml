@@ -3,6 +3,7 @@ noip_rfc2136:
     nameserver: 198.51.100.2
     zone: example.com.
     ttl: 30
+    create_enabled: False
     tsig_key_name: example_key_name
     tsig_key_secret: aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1vSGc1U0pZUkhBMA==
     tsig_key_algorithm: hmac-sha256

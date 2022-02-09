@@ -58,6 +58,8 @@ class AppConfig:
         self.dns.zone = self.loaded_yaml['noip_rfc2136']['dns']['zone']
         if self.loaded_yaml['noip_rfc2136']['dns'].get("ttl") is not None:
             self.dns.ttl = self.loaded_yaml['noip_rfc2136']['dns']['ttl']
+        if self.loaded_yaml['noip_rfc2136']['dns'].get("create_enabled") is not None:
+            self.dns.create_enabled = self.loaded_yaml['noip_rfc2136']['dns']['create_enabled']
         self.dns.tsig_key_name = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_name']
         self.dns.tsig_key_secret = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_secret']
         self.dns.tsig_key_algorithm = self.loaded_yaml['noip_rfc2136']['dns']['tsig_key_algorithm']
@@ -95,6 +97,7 @@ class AppConfig:
             self.nameserver = None
             self.zone = None
             self.ttl = 30
+            self.create_enabled = False
             self.key_name = None
             self.key_secret = None
             self.key_algorithm = None
@@ -232,12 +235,18 @@ async def UpdateReq(request):
         return web.Response(text='badagent')
 
     # FQDN does not exist
-    elif status == 'MISSING':
-        logger.error('FQDN does not exist!')
-        # Return 'nohost'
-        return web.Response(text='nohost')
+    if status == 'MISSING':
+        logger.warning("No DNS record for " + str(fqdn))
+        # Check if we're configured to create records
+        if config.dns.create_enabled:
+            logger.warning('Creating record for ' + str(fqdn))
+            status = 'OK'
+        else:
+            logger.error('FQDN does not exist and record creation is disabled!')
+            # Return 'nohost'
+            return web.Response(text='nohost')
 
-    elif status == 'OK':
+    if status == 'OK':
         # Check the new IP supplied is valid
         try:
             socket.inet_aton(new_ip)
@@ -266,6 +275,7 @@ def build_conf(config_file):
     config.dns.nameserver = os.environ.get('NOIP_RFC2136_DNS_NAMESERVER', config.dns.nameserver)
     config.dns.zone = os.environ.get('NOIP_RFC2136_DNS_ZONE', config.dns.zone)
     config.dns.ttl = os.environ.get('NOIP_RFC2136_DNS_TTL', config.dns.ttl)
+    config.dns.create_enabled = os.environ.get('NOIP_RFC2136_DNS_CREATE_ENABLED', config.dns.create_enabled)
     config.dns.tsig_key_name = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_NAME', config.dns.tsig_key_name)
     config.dns.tsig_key_secret = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_SECRET', config.dns.tsig_key_secret)
     config.dns.tsig_key_algorithm = os.environ.get('NOIP_RFC2136_DNS_TSIG_KEY_ALGORITHM', config.dns.tsig_key_algorithm)
@@ -293,6 +303,7 @@ def build_conf(config_file):
     logger.debug('config.dns.nameserver = ' + str(config.dns.nameserver))
     logger.debug('config.dns.zone = ' + str(config.dns.zone))
     logger.debug('config.dns.ttl = ' + str(config.dns.ttl))
+    logger.debug('config.dns.create_enabled = ' + str(config.dns.create_enabled))
     logger.debug('config.dns.tsig_key_name = ' + str(config.dns.tsig_key_name))
     logger.debug('config.dns.tsig_key_secret = ***********')
     logger.debug('config.dns.tsig_key_algorithm = ' + str(config.dns.tsig_key_algorithm))
