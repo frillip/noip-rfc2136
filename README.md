@@ -62,7 +62,7 @@ To use with a UDM-Pro, put these settings in the Dynamic DNS section of the Unif
  * Hostname: `dyndns.example.com`
  * Username: As configured in `basic_auth_user`
  * Password: As configured in `basic_auth_pass`
- * Server: example.com/\/nic/update?hostname=%h&myip=%i
+ * Server: example.com/\\/nic/update?hostname=%h&myip=%i
 
 The `Server` field should be the URL where `noip-rfc2136.py` can be accessed. I have not found a way to escape a port number into the unifi config, although the underlying process `inadyn` supports this.
 Instead I have a HTTPS-enabled webserver running in front of this script that proxies all requests to `/nic/*` to `http://127.0.0.1:8000`. There's some discussion on the how this piece of functionality works
