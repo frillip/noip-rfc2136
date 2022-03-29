@@ -63,8 +63,8 @@ Edit the sample YAML file to suit and save as `config.yaml`, or define them as e
 | YAML key | Description | Optional | Default | Environment variable |
 | :--- | :--- | :--- | :--- | :--- |
 | `enabled` |  Set to `True` to enable HTTP basic auth, `False` to disable | Yes | `False` | `NOIP_RFC2136_AUTH_ENABLED` |
-| `username` | String containing HTTP basic username | Yes | `None` | `NOIP_RFC2136_BASIC_AUTH_USERNAME` |
-| `password` | String containing HTTP basic password | Yes | `None` | `NOIP_RFC2136_BASIC_AUTH_PASSWORD` |
+| `username` | String containing HTTP basic username | Yes | `None` | `NOIP_RFC2136_AUTH_USERNAME` |
+| `password` | String containing HTTP basic password | Yes | `None` | `NOIP_RFC2136_AUTH_PASSWORD` |
 
 ### Logging config
 | YAML key | Description | Optional | Default | Environment variable |
