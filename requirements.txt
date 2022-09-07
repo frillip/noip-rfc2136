@@ -1,5 +1,5 @@
 aiohttp>=3.01
 aiohttp-basicauth-middleware==1.1.2
 colorlog
-dnspython==1.16.0
+dnspython==2.2.1
 pyyaml
