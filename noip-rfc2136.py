@@ -349,6 +349,7 @@ def main():
 
     app = web.Application()
     app.add_routes([web.get('/update', UpdateReq)])
+    app.add_routes([web.get('/nic/update', UpdateReq)])
     if config.auth.enabled:
         app.middlewares.append(
             basic_auth_middleware(
