@@ -272,7 +272,7 @@ def build_conf(config_file):
 
     config = AppConfig(config_file)
     # Update config from environment variables if present
-    config.dns.nameserver = os.environ.get('NOIP_RFC2136_DNS_NAMESERVER', config.dns.nameserver)
+    config.dns.nameserver = socket.gethostbyname(os.environ.get('NOIP_RFC2136_DNS_NAMESERVER', config.dns.nameserver))
     config.dns.zone = os.environ.get('NOIP_RFC2136_DNS_ZONE', config.dns.zone)
     config.dns.ttl = os.environ.get('NOIP_RFC2136_DNS_TTL', config.dns.ttl)
     config.dns.create_enabled = os.environ.get('NOIP_RFC2136_DNS_CREATE_ENABLED', config.dns.create_enabled)
