@@ -135,7 +135,7 @@ def GetCurrentIP(fqdn):
     curent_ip = None
     logger.debug('Querying IP for ' + str(fqdn) + ' from ' + str(config.dns.nameserver))
     try:
-        answer = resolver.query(fqdn, 'A')
+        answer = resolver.resolve(fqdn, 'A')
         current_ip = answer[0].to_text()
         status = 'OK'
         logger.debug('Got current IP: ' + str(current_ip))
